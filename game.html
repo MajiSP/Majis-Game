@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+    <audio id="backgroundMusic" src="your-music-file.mp3" loop></audio>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Majis top down shoota</title>
+    <style>
+        body {
+            user-select: none;
+            -moz-user-select: none;
+            -webkit-user-select: none;
+            -ms-user-select: none;
+        }
+        canvas {
+            display: block;
+            margin: auto;
+            background-color: #f0f0f0;
+        }
+        #info {
+            text-align: center;
+            font-size: 24px;
+        }
+        #health {
+            text-align: center;
+            font-size: 24px;
+        }
+        #gameOverBanner {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: red;
+            color: white;
+            font-size: 48px;
+            padding: 20px;
+            text-align: center;
+        }
+        #retryButton {
+            display: none;
+            position: absolute;
+            bottom: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: green;
+            color: white;
+            font-size: 24px;
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">Health: 100 | Wave: 1 | Enemies Killed: 0</div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div id="gameOverBanner">YOU HAVE DIED</div>
+    <div id="retryButton">Retry</div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gameOverBanner = document.getElementById('gameOverBanner');
+        const retryButton = document.getElementById('retryButton');
+
+        const player = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            size: 20,
+            health: 100,
+            weapon: 'pistol',
+            canChangeWeapon: false,
+            speed: 3
+        };
+
+        const enemies = [];
+        const enemySize = 15;
+        const enemySpeed = 2;
+
+        const bullets = [];
+        const bulletSize = 5;
+        const bulletSpeed = 5;
+
+        let keys = {};
+
+        let wave = 1;
+        let enemiesKilled = 0;
+        let gameRunning = true;
+
+        function updateInfoUI() {
+            document.getElementById('info').innerText = `Health: ${player.health} | Wave: ${wave} | Enemies Killed: ${enemiesKilled}`;
+
+            if (wave === 5 && !player.canChangeWeapon) {
+                showWeaponSelection();
+            }
+        }
+
+        function startBackgroundMusic() {
+            const backgroundMusic = document.getElementById('backgroundMusic');
+            backgroundMusic.play();
+        }
+
+        function showWeaponSelection() {
+            gameRunning = false;
+
+            const weaponSelection = document.createElement('div');
+            weaponSelection.id = 'weaponSelection';
+            weaponSelection.innerHTML = `
+                <h2>Select a weapon:</h2>
+                <button id="shotgun">Shotgun</button>
+                <button id="pistol">Pistol</button>
+                <button id="machineGun">Machine Gun</button>
+            `;
+            document.body.appendChild(weaponSelection);
+
+            document.getElementById('shotgun').addEventListener('click', () => selectWeapon('shotgun'));
+            document.getElementById('pistol').addEventListener('click', () => selectWeapon('pistol'));
+            document.getElementById('machineGun').addEventListener('click', () => selectWeapon('machineGun'));
+        }
+
+        function selectWeapon(weapon) {
+            const weaponSelection = document.getElementById('weaponSelection');
+            document.body.removeChild(weaponSelection);
+
+            player.weapon = weapon;
+            player.canChangeWeapon = true;
+
+            gameRunning = true;
+            gameLoop();
+        }
+
+        function spawnEnemy() {
+            const x = Math.random() * canvas.width;
+            const y = Math.random() * canvas.height;
+            const size = enemySize + (Math.floor((wave - 1) / 5) * 2);
+            enemies.push({ x, y, health: 5, size });
+        }
+
+        function moveEnemies() {
+            enemies.forEach(enemy => {
+                const dx = player.x - enemy.x;
+                const dy = player.y - enemy.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const moveX = dx / distance * enemySpeed;
+                const moveY = dy / distance * enemySpeed;
+
+                enemy.x += moveX;
+                enemy.y += moveY;
+            });
+        }
+
+        function checkCollisions() {
+            enemies.forEach((enemy, index) => {
+                const dx = player.x - enemy.x;
+                const dy = player.y - enemy.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < player.size / 2 + enemySize / 2) {
+                    player.health -= 2;
+                    updateInfoUI();
+                    enemies.splice(index, 1);
+                }
+            });
+
+            bullets.forEach((bullet, bulletIndex) => {
+                enemies.forEach((enemy, enemyIndex) => {
+                    const dx = bullet.x - enemy.x;
+                    const dy = bullet.y - enemy.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < bulletSize / 2 + enemySize / 2) {
+                        enemy.health -= 2;
+                        bullets.splice(bulletIndex, 1);
+
+                        if (enemy.health <= 0) {
+                            enemies.splice(enemyIndex, 1);
+                            enemiesKilled++;
+                            updateInfoUI();
+
+                            if (enemiesKilled % 20 === 0) {
+                                wave++;
+                                updateInfoUI();
+                            }
+                        }
+                    }
+                });
+            });
+        }
+
+        function drawPlayer() {
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.size / 2, 0, Math.PI * 2);
+            ctx.fillStyle = 'blue';
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function drawEnemies() {
+            enemies.forEach(enemy => {
+                ctx.beginPath();
+                ctx.arc(enemy.x, enemy.y, enemy.size / 2, 0, Math.PI * 2);
+                ctx.fillStyle = 'red';
+                ctx.fill();
+                ctx.closePath();
+                ctx.fillStyle = 'gray';
+                ctx.fillRect(enemy.x - enemy.size / 2, enemy.y - enemy.size, enemy.size, 5);
+                ctx.fillStyle = 'red';
+                ctx.fillRect(enemy.x - enemy.size / 2, enemy.y - enemy.size, enemy.size * (enemy.health / 5), 5);
+            });
+        }
+
+        function drawBullets() {
+            bullets.forEach(bullet => {
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, bulletSize / 2, 0, Math.PI * 2);
+                ctx.fillStyle = 'black';
+                ctx.fill();
+                ctx.closePath();
+            });
+        }
+
+        function movePlayer() {
+            if (keys['w'] && player.y > player.size / 2) {
+                player.y -= player.speed;
+            }
+            if (keys['a'] && player.x > player.size / 2) {
+                player.x -= player.speed;
+            }
+            if (keys['s'] && player.y < canvas.height - player.size / 2) {
+                player.y += player.speed;
+            }
+            if (keys['d'] && player.x < canvas.width - player.size / 2) {
+                player.x += player.speed;
+            }
+        }
+
+        function updateShootingDirection(e) {
+            if (player.weapon === 'machineGun' && player.machineGunInterval) {
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+
+                const dx = mouseX - player.x;
+                const dy = mouseY - player.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const directionX = dx / distance;
+                const directionY = dy / distance;
+
+                const spreadAngle = (Math.random() * 20 - 10) * (Math.PI / 180);
+                const spreadX = directionX * Math.cos(spreadAngle) - directionY * Math.sin(spreadAngle);
+                const spreadY = directionX * Math.sin(spreadAngle) + directionY * Math.cos(spreadAngle);
+                player.shootingDirection = { x: spreadX, y: spreadY };
+            }
+        }
+
+        function shootBullet(e) {
+            if (e.button === 0) {
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+
+                const dx = mouseX - player.x;
+                const dy = mouseY - player.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const directionX = dx / distance;
+                const directionY = dy / distance;
+
+                if (player.weapon === 'shotgun') {
+                    for (let i = 0; i < 5; i++) {
+                        const spreadAngle = (Math.random() * 20 - 10) * (Math.PI / 180);
+                        const spreadX = directionX * Math.cos(spreadAngle) - directionY * Math.sin(spreadAngle);
+                        const spreadY = directionX * Math.sin(spreadAngle) + directionY * Math.cos(spreadAngle);
+                        bullets.push({ x: player.x, y: player.y, directionX: spreadX, directionY: spreadY });
+                    }
+                } else if (player.weapon === 'pistol') {
+                    bullets.push({ x: player.x, y: player.y, directionX, directionY });
+                } else if (player.weapon === 'machineGun') {
+                    const spreadAngle = (Math.random() * 20 - 10) * (Math.PI / 180);
+                    const spreadX = directionX * Math.cos(spreadAngle) - directionY * Math.sin(spreadAngle);
+                    const spreadY = directionX * Math.sin(spreadAngle) + directionY * Math.cos(spreadAngle);
+                    bullets.push({ x: player.x, y: player.y, directionX: spreadX, directionY: spreadY });
+                    player.shootingDirection = { x: spreadX, y: spreadY };
+                    if (!player.machineGunInterval) {
+                        player.machineGunInterval = setInterval(() => {
+                            const spreadAngle = (Math.random() * 20 - 10) * (Math.PI / 180);
+                            const spreadX = player.shootingDirection.x * Math.cos(spreadAngle) - player.shootingDirection.y * Math.sin(spreadAngle);
+                            const spreadY = player.shootingDirection.x * Math.sin(spreadAngle) + player.shootingDirection.y * Math.cos(spreadAngle);
+                            
+                            bullets.push({
+                                x: player.x,
+                                y: player.y,
+                                directionX: spreadX,
+                                directionY: spreadY,
+                            });
+                        }, 100);
+                    }
+                }
+            }
+        }
+
+        function moveBullets() {
+            bullets.forEach((bullet, index) => {
+                bullet.x += bullet.directionX * bulletSpeed;
+                bullet.y += bullet.directionY * bulletSpeed;
+
+                if (bullet.x < 0 || bullet.x > canvas.width || bullet.y < 0 || bullet.y > canvas.height) {
+                    bullets.splice(index, 1);
+                }
+            });
+        }
+
+        function keyDownHandler(e) {
+            keys[e.key.toLowerCase()] = true;
+        }
+
+        function keyUpHandler(e) {
+            keys[e.key.toLowerCase()] = false;
+        }
+
+        function checkGameOver() {
+            if (player.health <= 0) {
+                gameOverBanner.style.display = 'block';
+                retryButton.style.display = 'block';
+                gameRunning = false;
+                return true;
+            }
+            return false;
+        }
+
+        function retryGame() {
+            player.health = 100;
+            enemiesKilled = 0;
+            wave = 0;
+            updateInfoUI();
+            enemies.length = 0;
+            bullets.length = 0;
+            gameOverBanner.style.display = 'none';
+            retryButton.style.display = 'none';
+            gameRunning = true;
+            gameLoop();
+        }
+
+        function gameLoop() {
+            if (!gameRunning) {
+                return;
+            }
+
+            if (checkGameOver()) {
+                return;
+            }
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (Math.random() < 0.01) {
+                spawnEnemy();
+            }
+
+            movePlayer();
+            moveEnemies();
+            moveBullets();
+            checkCollisions();
+
+            startBackgroundMusic();
+
+            drawPlayer();
+            drawEnemies();
+            drawBullets();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        window.addEventListener('keydown', keyDownHandler);
+        window.addEventListener('keyup', keyUpHandler);
+        canvas.addEventListener('mousedown', shootBullet);
+        canvas.addEventListener('mousemove', updateShootingDirection);
+        canvas.addEventListener('mouseup', (e) => {
+            if (e.button === 0 && player.weapon === 'machineGun' && player.machineGunInterval) {
+                clearInterval(player.machineGunInterval);
+                player.machineGunInterval = null;
+            }
+        });
+
+        retryButton.addEventListener('click', retryGame);
+
+        gameLoop();
+    </script>
+</body>
+</html>
