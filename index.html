@@ -3,7 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Majis top down shoota</title>
+    <div id="startMenu">
+        <h1>Majis Top Down Shooter</h1>
+        <label for="playerName">Enter your name:</label>
+        <input type="text" id="playerName" name="playerName" />
+        <button id="startGameButton">Start Game</button>
+      </div>
+      <div id="characterSelection" style="display: none;">
+        <h2>Select a character:</h2>
+        <button id="ninja">Ninja</button>
+        <button id="warrior">Warrior</button>
+        <button id="tank">Tank</button>
+      </div>
+      <div id="weaponSelection" style="display: none;">
+        <h2>Select a Weapon:</h2>
+        <button id="pistol">Pistol</button>
+        <button id="machineGun">Machine Gun</button>
+        <button id="shotgun">Shotgun</button>
+        <button id="sniperRifle">Sniper</button>
+        <button id="rocketLauncher">Rocket Launcher</button>
+      </div>
+      <div id="upgradePopup" style="display: none;">
+        <h2>Select an Upgrade:</h2>
+        <button id="healthRegen">Full Health</button>
+        <button id="weaponDamage">Increase Weapon Damage</button>
+        <button id="speed">Increase Movement</button>
+      </div>
+    </div>
     <style>
         body {
             background-color: #333333;
@@ -11,6 +37,41 @@
             -moz-user-select: none;
             -webkit-user-select: none;
             -ms-user-select: none;
+        }
+        #startMenu {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+        }
+        #characterSelection {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+        #weaponSelection {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+        #upgradePopup {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
         }
         canvas {
             display: block;
@@ -61,9 +122,15 @@
             padding: 10px 20px;
             cursor: pointer;
         }
+        .volume-label {
+            color: white;
+        }
     </style>
 </head>
 <body>
+    <br>
+    <label class="volume-label" for="volumeSlider">Volume:</label>
+    <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="1">
     <div id="info">
         <span class="health">Health: 100 </span> | 
         <span class="xp"> XP: 0 </span> |
@@ -75,6 +142,7 @@
     <div id="gameOverBanner">YOU HAVE DIED</div>
     <div id="retryButton">Retry</div>
     <script>
+
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const gameOverBanner = document.getElementById('gameOverBanner');
@@ -86,7 +154,7 @@
             size: 0,
             health: 0,
             maxHealth: 0,
-            weapon: 'pistol',
+            weapon: 'rocketLauncher',
             canChangeWeapon: false,
             speed: 0,
             xp: 0,
@@ -113,15 +181,7 @@
 
         let giantRedDotSpawned = false;
 
-        function drawImageOnCanvas() {
-            const canvas = document.getElementById("myCanvas");
-            const ctx = canvas.getContext("2d");
-            const img = new Image();
-            img.src = 'background.png';
-            img.onload = function() {
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            };
-        }
+        let upgradePopupVisible = false;
 
         function drawXPBar() {
             const ctx = document.getElementById('gameCanvas').getContext('2d');
@@ -153,7 +213,7 @@
                 ctx.stroke();
             }
 
-            if (percentage >= 100) {
+            if (percentage >= 100 && !upgradePopupVisible) {
                 player.xp = 0;
                 player.level++;
                 showUpgradePopup();
@@ -197,6 +257,10 @@
                 tooltip.innerHTML = 'Machine Gun: A high fire rate gun with large spread.';
             } else if (selection === 'shotgun') {
                 tooltip.innerHTML = 'Shotgun: A medium fire rate gun with large spread and huge damage.';
+            } else if (selection === 'sniperRifle') {
+                tooltip.innerHTML = 'Sniper: A medium fire rate gun that can penetrate enemies.';
+            } else if (selection === 'rocketLauncher') {
+                tooltip.innerHTML = 'Rocket Launcher: A slow fire rate gun that destroys enemies in a radius.';
             }
 
             document.body.appendChild(tooltip);
@@ -210,34 +274,27 @@
         }
 
         function showCharacterSelection() {
-            gameOverBanner.style.display = 'none';
-            retryButton.style.display = 'none';
+            gameOverBanner.style.display = "none";
+            retryButton.style.display = "none";
             gameRunning = false;
 
-            const characterSelection = document.createElement('div');
-            characterSelection.id = 'characterSelection';
-            characterSelection.innerHTML = `
-                <h2>Select a character:</h2>
-                <button id="ninja">Ninja</button>
-                <button id="warrior">Warrior</button>
-                <button id="tank">Tank</button>
-            `;
-            document.body.appendChild(characterSelection);
+            const characterSelection = document.getElementById("characterSelection");
+            characterSelection.style.display = "block";
 
-            const ninjaButton = document.getElementById('ninja');
-            ninjaButton.addEventListener('click', () => selectCharacter('ninja'));
-            ninjaButton.addEventListener('mouseover', (event) => showTooltip(event, 'ninja'));
-            ninjaButton.addEventListener('mouseout', hideTooltip);
+            const ninjaButton = document.getElementById("ninja");
+            ninjaButton.addEventListener("click", () => selectCharacter("ninja"));
+            ninjaButton.addEventListener("mouseover", (event) => showTooltip(event, "ninja"));
+            ninjaButton.addEventListener("mouseout", hideTooltip);
 
-            const warriorButton = document.getElementById('warrior');
-            warriorButton.addEventListener('click', () => selectCharacter('warrior'));
-            warriorButton.addEventListener('mouseover', (event) => showTooltip(event, 'warrior'));
-            warriorButton.addEventListener('mouseout', hideTooltip);
+            const warriorButton = document.getElementById("warrior");
+            warriorButton.addEventListener("click", () => selectCharacter("warrior"));
+            warriorButton.addEventListener("mouseover", (event) => showTooltip(event, "warrior"));
+            warriorButton.addEventListener("mouseout", hideTooltip);
 
-            const tankButton = document.getElementById('tank');
-            tankButton.addEventListener('click', () => selectCharacter('tank'));
-            tankButton.addEventListener('mouseover', (event) => showTooltip(event, 'tank'));
-            tankButton.addEventListener('mouseout', hideTooltip);
+            const tankButton = document.getElementById("tank");
+            tankButton.addEventListener("click", () => selectCharacter("tank"));
+            tankButton.addEventListener("mouseover", (event) => showTooltip(event, "tank"));
+            tankButton.addEventListener("mouseout", hideTooltip);
         }
 
         function selectCharacter(selection) {
@@ -272,16 +329,10 @@
 
         function showWeaponSelection() {
             gameRunning = false;
+            hideTooltip();
 
-            const weaponSelection = document.createElement('div');
-            weaponSelection.id = 'weaponSelection';
-            weaponSelection.innerHTML = `
-                <h2>Select a weapon:</h2>
-                <button id="shotgun">Shotgun</button>
-                <button id="pistol">Pistol</button>
-                <button id="machineGun">Machine Gun</button>
-            `;
-            document.body.appendChild(weaponSelection);
+            const weaponSelection = document.getElementById("weaponSelection");
+            weaponSelection.style.display = "block";
 
             const machinegunButton = document.getElementById('machineGun');
             machinegunButton.addEventListener('click', () => selectWeapon('machineGun'));
@@ -297,6 +348,16 @@
             shotgunButton.addEventListener('click', () => selectWeapon('shotgun'));
             shotgunButton.addEventListener('mouseover', (event) => showTooltip(event, 'shotgun'));
             shotgunButton.addEventListener('mouseout', hideTooltip);
+
+            const sniperButton = document.getElementById('sniperRifle');
+            sniperButton.addEventListener('click', () => selectWeapon('sniperRifle'));
+            sniperButton.addEventListener('mouseover', (event) => showTooltip(event, 'sniperRifle'));
+            sniperButton.addEventListener('mouseout', hideTooltip);
+
+            const rocketButton = document.getElementById('rocketLauncher');
+            rocketButton.addEventListener('click', () => selectWeapon('rocketLauncher'));
+            rocketButton.addEventListener('mouseover', (event) => showTooltip(event, 'rocketLauncher'));
+            rocketButton.addEventListener('mouseout', hideTooltip);
         }
 
         function selectWeapon(selection) {
@@ -309,35 +370,40 @@
                 player.weaponDamage = 1;
             } else if (selection === 'shotgun') {
                 player.weaponDamage = 4;
+            } else if (selection === 'sniperRifle') {
+                player.weaponDamage = 4;
+            } else if (selection === 'rocketLauncher') {
+                player.weaponDamage = 8;
             }
 
-            hideTooltip();
             gameRunning = true;
             updateInfoUI();
             gameLoop();
         }
 
+        let eventListenersAdded = false;
+
         function showUpgradePopup() {
+            if (upgradePopupVisible) {
+                return;
+            }
             gameRunning = false;
+            upgradePopupVisible = true;
 
-            const upgradePopup = document.createElement('div');
-            upgradePopup.id = 'upgradePopup';
-            upgradePopup.innerHTML = `
-                <h2>Choose an upgrade:</h2>
-                <button id="healthRegen">Health Regeneration</button>
-                <button id="weaponDamage">Increased Weapon Damage</button>
-                <button id="speed">Increased Speed</button>
-            `;
-            document.body.appendChild(upgradePopup);
+            const upgradePopup = document.getElementById("upgradePopup");
+            upgradePopup.style.display = "block";
 
-            document.getElementById('healthRegen').addEventListener('click', () => applyUpgrade('healthRegen'));
-            document.getElementById('weaponDamage').addEventListener('click', () => applyUpgrade('weaponDamage'));
-            document.getElementById('speed').addEventListener('click', () => applyUpgrade('speed'));
+            if (!eventListenersAdded) {
+                document.getElementById('healthRegen').addEventListener('click', () => applyUpgrade('healthRegen'));
+                document.getElementById('weaponDamage').addEventListener('click', () => applyUpgrade('weaponDamage'));
+                document.getElementById('speed').addEventListener('click', () => applyUpgrade('speed'));
+                eventListenersAdded = true;
+            }
         }
 
         function applyUpgrade(upgrade) {
-            const upgradePopup = document.getElementById('upgradePopup');
-            document.body.removeChild(upgradePopup);
+            const upgradePopup = document.getElementById("upgradePopup");
+            upgradePopup.style.display = "none";
 
             if (upgrade === 'healthRegen') {
                 player.health = player.maxHealth;
@@ -349,6 +415,7 @@
 
             player.xp = 0;
             gameRunning = true;
+            upgradePopupVisible = false;
             gameLoop();
         }
 
@@ -401,13 +468,13 @@
 
         function spawnEnemy(wave) {
             const healthIncrease = Math.floor(wave / 5) * 10;
-            const size = Math.floor(wave / 5) * 5;
+            const enemySizeIncrease  = Math.floor(wave / 5) * 5;
             let enemy;
 
             if (wave === 5 && !bigBadDogSpawned) {
                 enemy = {
                     enemyhealth: 100,
-                    enemySize: 15 + size,
+                    enemySize: 15 + enemySizeIncrease,
                     label: "BIG BAD DOG",
                 };
                 bigBadDogSpawned = true;
@@ -415,14 +482,14 @@
                     if (wave === 10 && !giantRedDotSpawned) {
                         enemy = {
                             enemyhealth: 500,
-                            enemySize: 15 + size,
+                            enemySize: 15 + enemySizeIncrease,
                             label: "GIANT RED DOT",
                         };
                         giantRedDotSpawned = true;
                         } else {
                         enemy = {
                             enemyhealth: 5 + healthIncrease,
-                            enemySize: 15 + size,
+                            enemySize: 15 + enemySizeIncrease,
                             label: "",
                         };
                     }
@@ -455,50 +522,131 @@
 
         function checkXP() {
             const requiredXP = player.level * 50 * (player.level - 1);
+            if (player.xp >= requiredXP) {
+                player.level++;
+                player.xp -= requiredXP;
+                updateInfoUI();
+            }
             drawXPBar();
         }
 
-        function checkCollisions() { 
-            enemies.forEach((enemy, index) => { 
-                const dx = player.x - enemy.x; 
-                const dy = player.y - enemy.y; 
-                const distance = Math.sqrt(dx * dx + dy * dy); 
-                
-                if (distance < player.size / 2 + enemySize / 2) { 
-                    player.health -= enemySize; 
-                    updateInfoUI(); 
-                    enemies.splice(index, 1); 
-                } 
-            }); 
-            
-            bullets.forEach((bullet, bulletIndex) => { 
-                enemies.forEach((enemy, enemyIndex) => { 
-                    const dx = bullet.x - enemy.x; 
-                    const dy = bullet.y - enemy.y; 
-                    const distance = Math.sqrt(dx * dx + dy * dy); 
-                    
-                    if (distance < bulletSize / 2 + enemySize / 2) {
+        function checkCollisions() {
+            enemies.forEach((enemy, index) => {
+                const dx = player.x - enemy.x;
+                const dy = player.y - enemy.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < player.size / 2 + Math.max(enemyImage.width * enemy.size / (enemy.size * 3) - 40, enemyImage.height * enemy.size / (enemy.size * 3) - 40) / 2) {
+                        player.health -= enemy.size;
+                        updateInfoUI();
+                        enemies.splice(index, 1);
+                    }
+            });
+
+            bullets.forEach((bullet, bulletIndex) => {
+                let enemiesHit = [];
+                let enemiesToRemove = [];
+                let explosionCreated = false;
+                enemies.forEach((enemy, enemyIndex) => {
+                    const dx = bullet.x - enemy.x;
+                    const dy = bullet.y - enemy.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < bulletSize / 2 + Math.max(enemyImage.width * enemy.size / (enemy.size * 3), enemyImage.height * enemy.size / (enemy.size * 3)) / 2) {
+                        if (player.weapon === 'sniperRifle') {
+                            bullet.penetrations--;
+                            if (bullet.penetrations <= 0) {
+                                bullets.splice(bulletIndex, 1);
+                            }
+                        } else {
+                            bullets.splice(bulletIndex, 1);
+                        }
+
                         const initialHealth = enemy.health;
                         enemy.health -= player.weaponDamage;
-                        bullets.splice(bulletIndex, 1);
-                        
-                        if (enemy.health <= 0) { 
-                            const xpGained = enemy.initialHealth;
-                            player.xp += xpGained;
-                            player.xp1 += xpGained;
-                            enemies.splice(enemyIndex, 1); 
-                            enemiesKilled++; 
-                            checkXP();
-                            drawXPBar();
-                            updateInfoUI(); 
-                            if (enemiesKilled % 20 === 0) { 
-                                wave++; 
-                                updateInfoUI(); 
-                            } 
-                        } 
-                    } 
-                }); 
-            }); 
+
+                        if (enemy.health <= 0) {
+                            enemiesToRemove.push(enemyIndex);
+                        }
+
+                        if (player.weapon === 'rocketLauncher') {
+                            if (!explosionCreated) {
+                                const explosion = createExplosion(bullet.x, bullet.y);
+                                activeExplosions.push(explosion);
+                                explosionCreated = true;
+                            }
+                            const splashRadius = 100;
+                            const splashDamage = player.weaponDamage * 0.9;
+
+                            const dx2 = enemy.x - bullet.x;
+                            const dy2 = enemy.y - bullet.y;
+                            const distance2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+
+                            if (distance2 < splashRadius) {
+                                enemy.health -= splashDamage;
+                                if (enemy.health <= 0) {
+                                    enemiesToRemove.push(enemyIndex);
+                                }
+                            }
+                        }
+                    }
+                });
+
+                for (let i = enemiesToRemove.length - 1; i >= 0; i--) {
+                    const enemyIndex = enemiesToRemove[i];
+                    const enemy = enemies[enemyIndex];
+                    const xpGained = enemy.initialHealth;
+                    player.xp += xpGained;
+                    player.xp1 += xpGained;
+                    enemies.splice(enemyIndex, 1);
+                    enemiesKilled++;
+                    checkXP();
+                    drawXPBar();
+                    updateInfoUI();
+                    if (enemiesKilled % 20 === 0) {
+                        wave++;
+                        updateInfoUI();
+                    }
+                }
+            });
+        }
+
+        let activeExplosions = [];
+
+        function createExplosion(x, y) {
+            let particles = [];
+
+            for (let i = 0; i < 500; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 2;
+                const dx = Math.cos(angle) * speed;
+                const dy = Math.sin(angle) * speed;
+                particles.push({ x, y, dx, dy, life: 1 });
+            }
+            function animateExplosion() {
+
+                ctx.fillStyle = 'rgba(255, 165, 0, 0.5)';
+                particles.forEach(particle => {
+                    ctx.beginPath();
+                    ctx.arc(particle.x, particle.y, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+
+                particles.forEach(particle => {
+                    particle.x += particle.dx;
+                    particle.y += particle.dy;
+                    particle.life -= 0.005;
+                });
+
+                particles = particles.filter(particle => particle.life > 0);
+
+                if (particles.length > 0) {
+                    requestAnimationFrame(animateExplosion);
+                }
+            }
+
+            // Start the explosion animation
+            return animateExplosion;
         }
 
         const playerImage = new Image();
@@ -521,6 +669,16 @@
             ctx.drawImage(playerImage, -(player.size * 10) / 2, -(player.size * 10) / 2, player.size * 10, player.size * 10);
 
             ctx.restore();
+
+            drawPlayerName(player.name, playerX + (player.size * 10) / 2, playerY);
+        }
+
+        function drawPlayerName(name, x, y) {
+            const ctx = document.getElementById("gameCanvas").getContext("2d");
+            ctx.font = "16px Arial";
+            ctx.fillStyle = "black";
+            ctx.textAlign = "center";
+            ctx.fillText(name, x, y - 10);
         }
 
         const enemyImage = new Image();
@@ -528,6 +686,7 @@
 
         function drawEnemies() {
             enemies.forEach((enemy) => {
+
                 const enemyX = enemy.x - (enemy.size * 3) / 2;
                 const enemyY = enemy.y - (enemy.size * 3) / 2;
 
@@ -605,8 +764,16 @@
             }
         }
 
+        let lastShotTime = {
+            shotgun: 0,
+            pistol: 0,
+            sniperRifle: 0,
+            rocketLauncher: 0
+        };
+
         function shootBullet(e) {
             if (e.button === 0) {
+                const currentTime = Date.now();
                 const rect = canvas.getBoundingClientRect();
                 const mouseX = e.clientX - rect.left;
                 const mouseY = e.clientY - rect.top;
@@ -617,14 +784,22 @@
                 const directionX = dx / distance;
                 const directionY = dy / distance;
 
-                if (player.weapon === 'shotgun') {
+                const canShoot = (weapon, delay) => {
+                    if (currentTime - lastShotTime[weapon] >= delay) {
+                        lastShotTime[weapon] = currentTime;
+                        return true;
+                    }
+                    return false;
+                };
+
+                if (player.weapon === 'shotgun' && canShoot('shotgun', 500)) {
                     for (let i = 0; i < 5; i++) {
                         const spreadAngle = (Math.random() * 20 - 10) * (Math.PI / 180);
                         const spreadX = directionX * Math.cos(spreadAngle) - directionY * Math.sin(spreadAngle);
                         const spreadY = directionX * Math.sin(spreadAngle) + directionY * Math.cos(spreadAngle);
                         bullets.push({ x: player.x, y: player.y, directionX: spreadX, directionY: spreadY });
                     }
-                } else if (player.weapon === 'pistol') {
+                } else if (player.weapon === 'pistol' && canShoot('pistol', 500)) {
                     bullets.push({ x: player.x, y: player.y, directionX, directionY });
                 } else if (player.weapon === 'machineGun') {
                     const spreadAngle = (Math.random() * 20 - 10) * (Math.PI / 180);
@@ -646,6 +821,10 @@
                             });
                         }, 100);
                     }
+                } else if (player.weapon === 'sniperRifle' && canShoot('sniperRifle', 3000)) {
+                    bullets.push({ x: player.x, y: player.y, directionX, directionY, penetrations: 7 });
+                } else if (player.weapon === 'rocketLauncher' && canShoot('rocketLauncher', 1000)) {
+                    bullets.push({ x: player.x, y: player.y, directionX, directionY });
                 }
             }
         }
@@ -696,6 +875,8 @@
             showCharacterSelection();
         }
 
+        let frameCounter = 0;
+
         function gameLoop() {
 
             if (!gameRunning) {
@@ -713,6 +894,14 @@
                 spawnEnemy(wave);
             }
 
+            hideTooltip();
+
+            activeExplosions.forEach((explosion, index) => {
+                if (explosion()) {
+                    activeExplosions.splice(index, 1);
+                }
+            });
+
             movePlayer();
             moveEnemies();
             moveBullets();
@@ -726,6 +915,21 @@
 
             requestAnimationFrame(gameLoop);
         }
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                gameRunning = !gameRunning
+                if (gameRunning === false) {
+                    const ctx = document.getElementById('gameCanvas').getContext('2d');
+                    ctx.font = '48px Arial';
+                    ctx.fillStyle = 'white';
+                    ctx.fillText('PAUSED', 100, 100);
+                } else {
+                    gameRunning = true;
+                    gameLoop();
+                }
+            }
+        });
 
         window.addEventListener('keydown', keyDownHandler);
         window.addEventListener('keyup', keyUpHandler);
@@ -746,11 +950,33 @@
             }
         });
 
+        const audioElement = new Audio('battlemusic.mp3');
+        audioElement.loop = true;
         retryButton.addEventListener('click', retryGame);
+        document.getElementById("startGameButton").addEventListener("click", () => {
+            audioElement.play();
+            startGame();
+        });
+        const volumeSlider = document.getElementById('volumeSlider');
+        volumeSlider.addEventListener('input', () => {
+            audioElement.volume = volumeSlider.value;
+        });
+        document.getElementById("startMenu").style.display = "block";
 
-        showCharacterSelection();
-
-        gameLoop();
+        function startGame() {
+            const playerName = document.getElementById("playerName").value;
+            if (playerName) {
+                document.getElementById("startMenu").style.display = "none";
+                console.log("Player name:", playerName);
+                player.health = 100;
+                player.name = playerName;
+                showCharacterSelection();
+                generateInitialObstacles();
+                gameLoop();
+            } else {
+                alert("Please enter your name");
+            }
+        }
 
     </script>
 </body>
