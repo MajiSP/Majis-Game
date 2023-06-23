@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Majis top down shoota</title>
+    <style>
+        body {
+            background-color: #333333;
+            user-select: none;
+            -moz-user-select: none;
+            -webkit-user-select: none;
+            -ms-user-select: none;
+        }
+        canvas {
+            display: block;
+            margin: auto;
+            background-color: #008514;
+        }
+        #info {
+            display: flex;
+            justify-content: center;
+            font-size: 25px;
+        }
+        .health {
+            color: lightcoral;
+        }
+        .level {
+            color: lightblue;
+        }
+        .wave {
+            color: white;
+        }
+        .enemies-killed {
+            color: rgb(177, 0, 177);
+        }
+        .xp {
+            color: rgb(0, 185, 0);
+        }
+        #gameOverBanner {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: red;
+            color: white;
+            font-size: 48px;
+            padding: 20px;
+            text-align: center;
+        }
+        #retryButton {
+            display: none;
+            position: absolute;
+            bottom: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: green;
+            color: white;
+            font-size: 24px;
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <span class="health">Health: 100 </span> | 
+        <span class="xp"> XP: 0 </span> |
+        <span class="level"> Level: 1 </span> | 
+        <span class="wave"> Wave: 1 </span> | 
+        <span class="enemies-killed"> Enemies Killed: 0</span>
+    </div>
+    <canvas id="gameCanvas" width="1920" height="1080"></canvas>
+    <div id="gameOverBanner">YOU HAVE DIED</div>
+    <div id="retryButton">Retry</div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gameOverBanner = document.getElementById('gameOverBanner');
+        const retryButton = document.getElementById('retryButton');
+
+        const player = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            size: 0,
+            health: 0,
+            maxHealth: 0,
+            weapon: 'pistol',
+            canChangeWeapon: false,
+            speed: 0,
+            xp: 0,
+            xp1: 0,
+            level: 1,
+        };
+
+        const enemies = [];
+        const enemySpeed = 2;
+
+        const enemySize = 15;
+
+        const bullets = [];
+        const bulletSize = 5;
+        const bulletSpeed = 5;
+
+        let keys = {};
+
+        let wave = 1;
+        let enemiesKilled = 0;
+        let gameRunning = true;
+
+        let bigBadDogSpawned = false;
+
+        let giantRedDotSpawned = false;
+
+        function drawImageOnCanvas() {
+            const canvas = document.getElementById("myCanvas");
+            const ctx = canvas.getContext("2d");
+            const img = new Image();
+            img.src = 'background.png';
+            img.onload = function() {
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            };
+        }
+
+        function drawXPBar() {
+            const ctx = document.getElementById('gameCanvas').getContext('2d');
+            const requiredXP = player.level * 40 * (player.level - 1);
+            const percentage = (player.xp / requiredXP) * 100;
+            const barWidth = (ctx.canvas.width * percentage) / 100;
+            const barHeight = 15;
+            const barY = ctx.canvas.height - barHeight;
+
+            ctx.fillStyle = "gray";
+            ctx.fillRect(0, barY, ctx.canvas.width, barHeight);
+
+            ctx.strokeStyle = "black";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(0, barY, ctx.canvas.width, barHeight);
+
+            const gradient = ctx.createLinearGradient(0, barY, ctx.canvas.width, barY);
+            gradient.addColorStop(0, 'darkblue');
+            gradient.addColorStop(1, 'lightblue');
+
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, barY, barWidth, barHeight);
+
+            for (let i = 10; i < ctx.canvas.width; i += ctx.canvas.width / 10) {
+                ctx.strokeStyle = 'black';
+                ctx.beginPath();
+                ctx.moveTo(i, barY);
+                ctx.lineTo(i, ctx.canvas.height);
+                ctx.stroke();
+            }
+
+            if (percentage >= 100) {
+                player.xp = 0;
+                player.level++;
+                showUpgradePopup();
+            }
+        }
+
+        function updateInfoUI() {
+            document.getElementById('info').innerHTML = `
+                <span class="health">Health: ${player.health}</span> |
+                <span class="level">Level: ${player.level}</span> |
+                <span class="xp">XP: ${player.xp1}</span> |
+                <span class="wave">Wave: ${wave}</span> |
+                <span class="enemies-killed">Enemies Killed: ${enemiesKilled}</span>
+            `;
+
+            if (wave === 2 && !player.canChangeWeapon) {
+                showWeaponSelection();
+            }
+        }
+
+        function showTooltip(event, selection) {
+            const tooltip = document.createElement('div');
+            tooltip.id = 'tooltip';
+            tooltip.style.position = 'absolute';
+            tooltip.style.left = `${event.clientX + 10}px`;
+            tooltip.style.top = `${event.clientY + 10}px`;
+            tooltip.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+            tooltip.style.color = 'white';
+            tooltip.style.padding = '5px';
+            tooltip.style.borderRadius = '5px';
+
+            if (selection === 'ninja') {
+                tooltip.innerHTML = 'Ninja: Fast and agile, but low health.';
+            } else if (selection === 'warrior') {
+                tooltip.innerHTML = 'Warrior: Balanced stats, good for beginners.';
+            } else if (selection === 'tank') {
+                tooltip.innerHTML = 'Tank: High health and defense, but slow.';
+            } else if (selection === 'pistol') {
+            tooltip.innerHTML = 'Pistol: A slow firing single shot pistol with low damage.';
+            } else if (selection === 'machineGun') {
+                tooltip.innerHTML = 'Machine Gun: A high fire rate gun with large spread.';
+            } else if (selection === 'shotgun') {
+                tooltip.innerHTML = 'Shotgun: A medium fire rate gun with large spread and huge damage.';
+            }
+
+            document.body.appendChild(tooltip);
+        }
+
+        function hideTooltip() {
+            const tooltip = document.getElementById('tooltip');
+            if (tooltip) {
+                document.body.removeChild(tooltip);
+            }
+        }
+
+        function showCharacterSelection() {
+            gameOverBanner.style.display = 'none';
+            retryButton.style.display = 'none';
+            gameRunning = false;
+
+            const characterSelection = document.createElement('div');
+            characterSelection.id = 'characterSelection';
+            characterSelection.innerHTML = `
+                <h2>Select a character:</h2>
+                <button id="ninja">Ninja</button>
+                <button id="warrior">Warrior</button>
+                <button id="tank">Tank</button>
+            `;
+            document.body.appendChild(characterSelection);
+
+            const ninjaButton = document.getElementById('ninja');
+            ninjaButton.addEventListener('click', () => selectCharacter('ninja'));
+            ninjaButton.addEventListener('mouseover', (event) => showTooltip(event, 'ninja'));
+            ninjaButton.addEventListener('mouseout', hideTooltip);
+
+            const warriorButton = document.getElementById('warrior');
+            warriorButton.addEventListener('click', () => selectCharacter('warrior'));
+            warriorButton.addEventListener('mouseover', (event) => showTooltip(event, 'warrior'));
+            warriorButton.addEventListener('mouseout', hideTooltip);
+
+            const tankButton = document.getElementById('tank');
+            tankButton.addEventListener('click', () => selectCharacter('tank'));
+            tankButton.addEventListener('mouseover', (event) => showTooltip(event, 'tank'));
+            tankButton.addEventListener('mouseout', hideTooltip);
+        }
+
+        function selectCharacter(selection) {
+            const characterSelection = document.getElementById('characterSelection');
+            document.body.removeChild(characterSelection);
+
+            if (selection === 'ninja') {
+                player.health = 60;
+                player.weaponDamage = 4;
+                player.speed = 3;
+                player.size = 2;
+                player.maxHealth = 60;
+            } else if (selection === 'warrior') {
+                player.health = 100;
+                player.weaponDamage = 2;
+                player.speed = 3.5;
+                player.size = 3;
+                player.maxHealth = 100;
+            } else if (selection === 'tank') {
+                player.health = 150;
+                player.weaponDamage = 3;
+                player.speed = 2.5;
+                player.size = 4;
+                player.maxHealth = 150;
+            }
+
+            hideTooltip();
+            gameRunning = true;
+            updateInfoUI();
+            gameLoop();
+        }
+
+        function showWeaponSelection() {
+            gameRunning = false;
+
+            const weaponSelection = document.createElement('div');
+            weaponSelection.id = 'weaponSelection';
+            weaponSelection.innerHTML = `
+                <h2>Select a weapon:</h2>
+                <button id="shotgun">Shotgun</button>
+                <button id="pistol">Pistol</button>
+                <button id="machineGun">Machine Gun</button>
+            `;
+            document.body.appendChild(weaponSelection);
+
+            const machinegunButton = document.getElementById('machineGun');
+            machinegunButton.addEventListener('click', () => selectWeapon('machineGun'));
+            machinegunButton.addEventListener('mouseover', (event) => showTooltip(event, 'machineGun'));
+            machinegunButton.addEventListener('mouseout', hideTooltip);
+
+            const pistolButton = document.getElementById('pistol');
+            pistolButton.addEventListener('click', () => selectWeapon('pistol'));
+            pistolButton.addEventListener('mouseover', (event) => showTooltip(event, 'pistol'));
+            pistolButton.addEventListener('mouseout', hideTooltip);
+
+            const shotgunButton = document.getElementById('shotgun');
+            shotgunButton.addEventListener('click', () => selectWeapon('shotgun'));
+            shotgunButton.addEventListener('mouseover', (event) => showTooltip(event, 'shotgun'));
+            shotgunButton.addEventListener('mouseout', hideTooltip);
+        }
+
+        function selectWeapon(selection) {
+            const weaponSelection = document.getElementById('weaponSelection');
+            document.body.removeChild(weaponSelection);
+
+            if (selection === 'machineGun') {
+                player.weaponDamage = 2;
+            } else if (selection === 'pistol') {
+                player.weaponDamage = 1;
+            } else if (selection === 'shotgun') {
+                player.weaponDamage = 4;
+            }
+
+            hideTooltip();
+            gameRunning = true;
+            updateInfoUI();
+            gameLoop();
+        }
+
+        function showUpgradePopup() {
+            gameRunning = false;
+
+            const upgradePopup = document.createElement('div');
+            upgradePopup.id = 'upgradePopup';
+            upgradePopup.innerHTML = `
+                <h2>Choose an upgrade:</h2>
+                <button id="healthRegen">Health Regeneration</button>
+                <button id="weaponDamage">Increased Weapon Damage</button>
+                <button id="speed">Increased Speed</button>
+            `;
+            document.body.appendChild(upgradePopup);
+
+            document.getElementById('healthRegen').addEventListener('click', () => applyUpgrade('healthRegen'));
+            document.getElementById('weaponDamage').addEventListener('click', () => applyUpgrade('weaponDamage'));
+            document.getElementById('speed').addEventListener('click', () => applyUpgrade('speed'));
+        }
+
+        function applyUpgrade(upgrade) {
+            const upgradePopup = document.getElementById('upgradePopup');
+            document.body.removeChild(upgradePopup);
+
+            if (upgrade === 'healthRegen') {
+                player.health = player.maxHealth;
+            } else if (upgrade === 'weaponDamage') {
+                player.weaponDamage += 1;
+            } else if (upgrade === 'speed') {
+                player.speed += 0.2;
+            }
+
+            player.xp = 0;
+            gameRunning = true;
+            gameLoop();
+        }
+
+        function selectWeapon(weapon) {
+            const weaponSelection = document.getElementById('weaponSelection');
+            document.body.removeChild(weaponSelection);
+
+            player.weapon = weapon;
+            player.canChangeWeapon = true;
+
+            gameRunning = true;
+            gameLoop();
+        }
+
+        function randomEdgePosition(player) {
+            const minDistance = 100;
+            let x, y;
+
+            do {
+                const edge = Math.floor(Math.random() * 4);
+
+                switch (edge) {
+                case 0:
+                    x = Math.random() * canvas.width;
+                    y = 0;
+                    break;
+                case 1:
+                    x = canvas.width;
+                    y = Math.random() * canvas.height;
+                    break;
+                case 2:
+                    x = Math.random() * canvas.width;
+                    y = canvas.height;
+                    break;
+                case 3:
+                    x = 0;
+                    y = Math.random() * canvas.height;
+                    break;
+                }
+            } while (distance(x, y, player.x, player.y) < minDistance);
+
+            return { x, y };
+        }
+
+        function distance(x1, y1, x2, y2) {
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        function spawnEnemy(wave) {
+            const healthIncrease = Math.floor(wave / 5) * 10;
+            const size = Math.floor(wave / 5) * 5;
+            let enemy;
+
+            if (wave === 5 && !bigBadDogSpawned) {
+                enemy = {
+                    enemyhealth: 100,
+                    enemySize: 15 + size,
+                    label: "BIG BAD DOG",
+                };
+                bigBadDogSpawned = true;
+                } else {
+                    if (wave === 10 && !giantRedDotSpawned) {
+                        enemy = {
+                            enemyhealth: 500,
+                            enemySize: 15 + size,
+                            label: "GIANT RED DOT",
+                        };
+                        giantRedDotSpawned = true;
+                        } else {
+                        enemy = {
+                            enemyhealth: 5 + healthIncrease,
+                            enemySize: 15 + size,
+                            label: "",
+                        };
+                    }
+                }
+
+            const { x, y } = randomEdgePosition(player);
+
+            enemies.push({
+                x,
+                y,
+                health: enemy.enemyhealth,
+                initialHealth: enemy.enemyhealth,
+                size: enemy.enemySize,
+                label: enemy.label,
+            });
+        }
+
+        function moveEnemies() {
+            enemies.forEach(enemy => {
+                const dx = player.x - enemy.x;
+                const dy = player.y - enemy.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const moveX = dx / distance * enemySpeed;
+                const moveY = dy / distance * enemySpeed;
+
+                enemy.x += moveX;
+                enemy.y += moveY;
+            });
+        }
+
+        function checkXP() {
+            const requiredXP = player.level * 50 * (player.level - 1);
+            drawXPBar();
+        }
+
+        function checkCollisions() { 
+            enemies.forEach((enemy, index) => { 
+                const dx = player.x - enemy.x; 
+                const dy = player.y - enemy.y; 
+                const distance = Math.sqrt(dx * dx + dy * dy); 
+                
+                if (distance < player.size / 2 + enemySize / 2) { 
+                    player.health -= enemySize; 
+                    updateInfoUI(); 
+                    enemies.splice(index, 1); 
+                } 
+            }); 
+            
+            bullets.forEach((bullet, bulletIndex) => { 
+                enemies.forEach((enemy, enemyIndex) => { 
+                    const dx = bullet.x - enemy.x; 
+                    const dy = bullet.y - enemy.y; 
+                    const distance = Math.sqrt(dx * dx + dy * dy); 
+                    
+                    if (distance < bulletSize / 2 + enemySize / 2) {
+                        const initialHealth = enemy.health;
+                        enemy.health -= player.weaponDamage;
+                        bullets.splice(bulletIndex, 1);
+                        
+                        if (enemy.health <= 0) { 
+                            const xpGained = enemy.initialHealth;
+                            player.xp += xpGained;
+                            player.xp1 += xpGained;
+                            enemies.splice(enemyIndex, 1); 
+                            enemiesKilled++; 
+                            checkXP();
+                            drawXPBar();
+                            updateInfoUI(); 
+                            if (enemiesKilled % 20 === 0) { 
+                                wave++; 
+                                updateInfoUI(); 
+                            } 
+                        } 
+                    } 
+                }); 
+            }); 
+        }
+
+        const playerImage = new Image();
+        playerImage.src = 'player.png';
+
+        function drawPlayer() {
+            const ctx = document.getElementById('gameCanvas').getContext('2d');
+
+            const playerX = player.x - (player.size * 10) / 2;
+            const playerY = player.y - (player.size * 10) / 2;
+
+            const angle = Math.atan2(mouseY - player.y, mouseX - player.x);
+
+            ctx.save();
+
+            ctx.translate(playerX + (player.size * 10) / 2, playerY + (player.size * 10) / 2);
+
+            ctx.rotate(angle + Math.PI / 2);
+
+            ctx.drawImage(playerImage, -(player.size * 10) / 2, -(player.size * 10) / 2, player.size * 10, player.size * 10);
+
+            ctx.restore();
+        }
+
+        const enemyImage = new Image();
+        enemyImage.src = 'enemy.png';
+
+        function drawEnemies() {
+            enemies.forEach((enemy) => {
+                const enemyX = enemy.x - (enemy.size * 3) / 2;
+                const enemyY = enemy.y - (enemy.size * 3) / 2;
+
+
+                const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+
+                ctx.save();
+
+                ctx.translate(enemyX + (enemy.size * 3) / 2, enemyY + (enemy.size * 3) / 2);
+                ctx.rotate(angle + Math.PI / 2);
+                ctx.drawImage(enemyImage, -(enemy.size * 3) / 2, -(enemy.size * 3) / 2, enemy.size * 3, enemy.size * 3);
+                ctx.restore();
+
+                const healthBarX = enemy.x - enemy.size / 2;
+                const healthBarY = enemy.y - enemy.size - 10;
+                ctx.fillStyle = 'gray';
+                ctx.fillRect(healthBarX, healthBarY, enemy.size, 5);
+                const healthBarWidth = enemy.size * (enemy.health / 5);
+                ctx.fillStyle = 'red';
+                ctx.fillRect(healthBarX, healthBarY, enemy.size * (enemy.health / 5), 5);
+                if (enemy.label) {
+                    ctx.font = '16px Arial';
+                    ctx.fillStyle = 'black';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(enemy.label, enemy.x, healthBarY - 10);
+                }
+            });
+        }
+
+        function drawBullets() {
+            bullets.forEach(bullet => {
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, bulletSize / 2, 0, Math.PI * 2);
+                ctx.fillStyle = 'black';
+                ctx.fill();
+                ctx.closePath();
+                ctx.beginPath();
+                ctx.moveTo(bullet.x, bullet.y);
+                ctx.lineTo(bullet.x - bullet.vx, bullet.y - bullet.vy);
+                ctx.stroke();
+            });
+        }
+
+        function movePlayer() {
+            if (keys['w'] && player.y > player.size / 2) {
+                player.y -= player.speed;
+            }
+            if (keys['a'] && player.x > player.size / 2) {
+                player.x -= player.speed;
+            }
+            if (keys['s'] && player.y < canvas.height - player.size / 2) {
+                player.y += player.speed;
+            }
+            if (keys['d'] && player.x < canvas.width - player.size / 2) {
+                player.x += player.speed;
+            }
+        }
+
+        function updateShootingDirection(e) {
+            if (player.weapon === 'machineGun' && player.machineGunInterval) {
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+
+                const dx = mouseX - player.x;
+                const dy = mouseY - player.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const directionX = dx / distance;
+                const directionY = dy / distance;
+
+                const spreadAngle = (Math.random() * 20 - 10) * (Math.PI / 180);
+                const spreadX = directionX * Math.cos(spreadAngle) - directionY * Math.sin(spreadAngle);
+                const spreadY = directionX * Math.sin(spreadAngle) + directionY * Math.cos(spreadAngle);
+                player.shootingDirection = { x: spreadX, y: spreadY };
+            }
+        }
+
+        function shootBullet(e) {
+            if (e.button === 0) {
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+
+                const dx = mouseX - player.x;
+                const dy = mouseY - player.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const directionX = dx / distance;
+                const directionY = dy / distance;
+
+                if (player.weapon === 'shotgun') {
+                    for (let i = 0; i < 5; i++) {
+                        const spreadAngle = (Math.random() * 20 - 10) * (Math.PI / 180);
+                        const spreadX = directionX * Math.cos(spreadAngle) - directionY * Math.sin(spreadAngle);
+                        const spreadY = directionX * Math.sin(spreadAngle) + directionY * Math.cos(spreadAngle);
+                        bullets.push({ x: player.x, y: player.y, directionX: spreadX, directionY: spreadY });
+                    }
+                } else if (player.weapon === 'pistol') {
+                    bullets.push({ x: player.x, y: player.y, directionX, directionY });
+                } else if (player.weapon === 'machineGun') {
+                    const spreadAngle = (Math.random() * 20 - 10) * (Math.PI / 180);
+                    const spreadX = directionX * Math.cos(spreadAngle) - directionY * Math.sin(spreadAngle);
+                    const spreadY = directionX * Math.sin(spreadAngle) + directionY * Math.cos(spreadAngle);
+                    bullets.push({ x: player.x, y: player.y, directionX: spreadX, directionY: spreadY });
+                    player.shootingDirection = { x: spreadX, y: spreadY };
+                    if (!player.machineGunInterval) {
+                        player.machineGunInterval = setInterval(() => {
+                            const spreadAngle = (Math.random() * 20 - 10) * (Math.PI / 180);
+                            const spreadX = player.shootingDirection.x * Math.cos(spreadAngle) - player.shootingDirection.y * Math.sin(spreadAngle);
+                            const spreadY = player.shootingDirection.x * Math.sin(spreadAngle) + player.shootingDirection.y * Math.cos(spreadAngle);
+                            
+                            bullets.push({
+                                x: player.x,
+                                y: player.y,
+                                directionX: spreadX,
+                                directionY: spreadY,
+                            });
+                        }, 100);
+                    }
+                }
+            }
+        }
+
+        function moveBullets() {
+            bullets.forEach((bullet, index) => {
+                bullet.x += bullet.directionX * bulletSpeed;
+                bullet.y += bullet.directionY * bulletSpeed;
+
+                if (bullet.x < 0 || bullet.x > canvas.width || bullet.y < 0 || bullet.y > canvas.height) {
+                    bullets.splice(index, 1);
+                }
+            });
+        }
+
+        function keyDownHandler(e) {
+            keys[e.key.toLowerCase()] = true;
+        }
+
+        function keyUpHandler(e) {
+            keys[e.key.toLowerCase()] = false;
+        }
+
+        function checkGameOver() {
+            if (player.health <= 0) {
+                gameOverBanner.style.display = 'block';
+                retryButton.style.display = 'block';
+                gameRunning = false;
+                return true;
+            }
+            return false;
+        }
+
+        function retryGame() {
+            player.xp = 0;
+            player.xp1 = 0;
+            player.level = 1;
+            enemiesKilled = 0;
+            wave = 0;
+            updateInfoUI();
+            enemies.length = 0;
+            bullets.length = 0;
+            gameOverBanner.style.display = 'none';
+            retryButton.style.display = 'none';
+            gameRunning = true;
+            gameLoop();
+            showCharacterSelection();
+        }
+
+        function gameLoop() {
+
+            if (!gameRunning) {
+                return;
+            }
+
+            if (checkGameOver()) {
+                return;
+            }
+
+            const ctx = document.getElementById('gameCanvas').getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (Math.random() < 0.01) {
+                spawnEnemy(wave);
+            }
+
+            movePlayer();
+            moveEnemies();
+            moveBullets();
+            checkCollisions();
+
+            drawPlayer();
+            drawEnemies();
+            drawBullets();
+
+            drawXPBar();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        window.addEventListener('keydown', keyDownHandler);
+        window.addEventListener('keyup', keyUpHandler);
+        canvas.addEventListener('mousedown', shootBullet);
+        canvas.addEventListener('mousemove', updateShootingDirection);
+        let mouseX = 0;
+        let mouseY = 0;
+
+        canvas.addEventListener('mousemove', (event) => {
+            const rect = canvas.getBoundingClientRect();
+            mouseX = event.clientX - rect.left;
+            mouseY = event.clientY - rect.top;
+        });
+        canvas.addEventListener('mouseup', (e) => {
+            if (e.button === 0 && player.weapon === 'machineGun' && player.machineGunInterval) {
+                clearInterval(player.machineGunInterval);
+                player.machineGunInterval = null;
+            }
+        });
+
+        retryButton.addEventListener('click', retryGame);
+
+        showCharacterSelection();
+
+        gameLoop();
+
+    </script>
+</body>
+</html>
